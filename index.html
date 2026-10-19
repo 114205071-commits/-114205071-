@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>今天的你是什麼顏色？</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#eef0f4;--ink:#1c2038;--mute:#5d627c;--line:#cfd3e0;--accent:#1c2038;
+--serif:"Noto Serif TC","Songti TC","PMingLiU",serif;--sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.7;transition:background .6s}
+main{max-width:980px;margin:0 auto;padding:40px 22px 60px;min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+h1,h2{font-family:var(--serif);line-height:1.25;margin:0}
+.screen{display:none}.screen.on{display:block}
+/* start */
+.hero{font-size:clamp(2.4rem,8vw,4.6rem);font-weight:700;letter-spacing:.02em}
+.hero span{display:inline-block;padding:0 .15em;border-radius:.2em;background:linear-gradient(100deg,#f2a65a,#e56b8a,#7a6ff0,#4fb3bf);color:#fff}
+.lead{max-width:30em;color:var(--mute);margin:20px 0 32px;font-size:1.05rem}
+.btn{font:500 1rem var(--sans);border:2px solid var(--ink);background:var(--ink);color:#fff;padding:12px 28px;border-radius:999px;cursor:pointer;transition:transform .15s,background .15s}
+.btn:hover{transform:translateY(-2px)}
+.btn.ghost{background:transparent;color:var(--ink)}
+button:focus-visible{outline:3px solid #7a6ff0;outline-offset:3px}
+/* quiz */
+.bar{display:flex;gap:6px;margin-bottom:34px}
+.bar i{flex:1;height:6px;border-radius:3px;background:var(--line);transition:background .4s}
+.bar i.done{background:var(--ink)}
+.q{font-size:clamp(1.6rem,4.5vw,2.4rem);margin-bottom:26px}
+.opts{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.opt{display:flex;align-items:center;gap:14px;text-align:left;font:500 1rem/1.5 var(--sans);color:var(--ink);background:#fff;border:2px solid var(--line);border-radius:16px;padding:18px;cursor:pointer;transition:border-color .2s,transform .15s}
+.opt:hover{border-color:var(--ink);transform:translateY(-2px)}
+.opt b{flex:none;width:14px;height:14px;border-radius:50%;background:var(--c)}
+/* result */
+.res{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:36px;align-items:center}
+canvas{width:100%;height:auto;aspect-ratio:1;border-radius:20px;display:block;box-shadow:0 20px 50px -20px rgba(28,32,56,.45)}
+.swatches{display:flex;gap:10px;margin:18px 0}
+.sw{border:0;width:46px;height:46px;border-radius:50%;cursor:pointer;background:var(--c);transition:transform .15s}
+.sw:hover{transform:scale(1.12)}
+.hex{min-height:1.6em;color:var(--mute);font-size:.95rem}
+.rname{font-size:clamp(2rem,6vw,3.2rem)}
+.tag{color:var(--mute);margin:4px 0 14px}
+.acts{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
+@media(max-width:760px){.res{grid-template-columns:1fr}.opts{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <section id="s-start" class="screen on">
+    <h1 class="hero">今天的你<br>是什麼<span>顏色</span>？</h1>
+    <p class="lead">回答 5 個生活小問題，我們會依照你的選擇，為你畫出專屬於今天的一幅色彩作品。</p>
+    <button class="btn" id="go">開始測驗</button>
+  </section>
+
+  <section id="s-quiz" class="screen">
+    <div class="bar" id="bar"></div>
+    <h2 class="q" id="q"></h2>
+    <div class="opts" id="opts"></div>
+  </section>
+
+  <section id="s-res" class="screen">
+    <div class="res">
+      <canvas id="cv" width="900" height="900" aria-label="根據你的答案生成的色彩作品"></canvas>
+      <div>
+        <p class="tag" id="rtag"></p>
+        <h2 class="rname" id="rname"></h2>
+        <div class="swatches" id="sws"></div>
+        <p class="hex" id="hex">點擊色票可複製色碼</p>
+        <p id="rdesc"></p>
+        <p id="rtip" style="color:var(--mute)"></p>
+        <div class="acts">
+          <button class="btn" id="dl">下載我的作品</button>
+          <button class="btn ghost" id="again">重新測驗</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+// 題目：每個選項對應一種色彩傾向 (0 暖 / 1 冷 / 2 綠 / 3 紫)
+const QUESTIONS = [
+  {q:"早上醒來，你最想先做什麼？", o:["衝出門曬太陽","靜靜滑手機慢慢開機","泡杯茶看窗外","繼續賴床做白日夢"]},
+  {q:"理想的週末行程是？", o:["約朋友逛市集","在家追劇放空","去山上走走","逛展覽或書店"]},
+  {q:"你現在的心情像哪種天氣？", o:["萬里無雲的晴天","微微下雨的陰天","有風的午後","染紅天空的黃昏"]},
+  {q:"現在想喝哪一杯？", o:["冰涼的芒果冰沙","氣泡水加檸檬","抹茶拿鐵","芋頭鮮奶"]},
+  {q:"你現在的能量狀態是？", o:["滿格，隨時出發","需要充電一下","穩穩的，剛剛好","說不上來，但很有靈感"]}
+];
+// 四種色彩類型
+const TYPES = [
+  {name:"琥珀橘", tag:"溫暖、行動力強的你", pal:["#f2a65a","#e56b3c","#f7d08a","#c9453b"], bg:"#fbeedd",
+   desc:"你像一束午後的陽光，走到哪裡都帶著熱度。你喜歡直接行動，也很容易感染身邊的人。", tip:"今天適合：主動約一個久沒聯絡的朋友。"},
+  {name:"湖水藍", tag:"冷靜、善於觀察的你", pal:["#4fb3bf","#2f5d8a","#a9dbe0","#1c2f55"], bg:"#e3f0f4",
+   desc:"你像一片安靜的湖，表面平穩，內裡其實很深。你需要獨處來整理思緒，也因此看得比別人清楚。", tip:"今天適合：關掉通知，給自己一小時安靜時間。"},
+  {name:"苔蘚綠", tag:"踏實、讓人安心的你", pal:["#6aa57a","#2f7a5b","#bfdca8","#1f4d3d"], bg:"#e8f1e4",
+   desc:"你像一棵慢慢長大的樹，不急著表現，卻讓人覺得可靠。你懂得在忙碌中保留自己的步調。", tip:"今天適合：散步十五分鐘，順便整理心情。"},
+  {name:"暮光紫", tag:"浪漫、富有想像力的你", pal:["#8a74e6","#d26fb0","#c9b8f5","#3d2c7a"], bg:"#eeeafa",
+   desc:"你像傍晚天空裡漸變的顏色，總有不一樣的想法。你的靈感來得突然，也最適合把它記下來。", tip:"今天適合：把腦中的點子寫進筆記本。"}
+];
+let step=0, answers=[];
+const $=id=>document.getElementById(id);
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));window.scrollTo(0,0)}
+
+function renderQ(){
+  const item=QUESTIONS[step];
+  $('q').textContent=item.q;
+  $('bar').innerHTML=QUESTIONS.map((_,i)=>`<i class="${i<step?'done':''}"></i>`).join('');
+  $('opts').innerHTML='';
+  item.o.forEach((text,i)=>{
+    const b=document.createElement('button');
+    b.className='opt';
+    b.style.setProperty('--c',TYPES[i].pal[0]);
+    b.innerHTML='<b></b><span></span>';
+    b.lastChild.textContent=text;
+    b.onclick=()=>{answers.push(i);step++;step<QUESTIONS.length?renderQ():finish()};
+    $('opts').appendChild(b);
+  });
+}
+
+function finish(){
+  const count=[0,0,0,0];
+  answers.forEach(a=>count[a]++);
+  const max=Math.max(...count);
+  // 平手時以最後一題的選擇為準
+  let t=count[answers[answers.length-1]]===max?answers[answers.length-1]:count.indexOf(max);
+  const T=TYPES[t];
+  $('rname').textContent=T.name;
+  $('rtag').textContent=T.tag;
+  $('rdesc').textContent=T.desc;
+  $('rtip').textContent=T.tip;
+  $('hex').textContent='點擊色票可複製色碼';
+  document.body.style.background=T.bg;
+  $('sws').innerHTML='';
+  T.pal.forEach(c=>{
+    const b=document.createElement('button');
+    b.className='sw';b.style.setProperty('--c',c);b.title=c;b.setAttribute('aria-label','複製色碼 '+c);
+    b.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(c).catch(()=>{});$('hex').textContent='已複製 '+c};
+    $('sws').appendChild(b);
+  });
+  draw(T);
+  show('s-res');
+}
+
+// 以答案組合產生固定的亂數種子，同樣答案會得到同一幅畫
+function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function draw(T){
+  const cv=$('cv'),ctx=cv.getContext('2d'),W=cv.width;
+  const r=rng(answers.reduce((s,a,i)=>s*7+a+1+i,13));
+  ctx.globalCompositeOperation='source-over';
+  ctx.fillStyle=T.bg;ctx.fillRect(0,0,W,W);
+  const n=9+answers[0]*2;
+  for(let i=0;i<n;i++){
+    const x=r()*W,y=r()*W,rad=140+r()*300,c=T.pal[Math.floor(r()*T.pal.length)];
+    const g=ctx.createRadialGradient(x,y,0,x,y,rad);
+    g.addColorStop(0,c+'dd');g.addColorStop(1,c+'00');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fill();
+  }
+  // 細線圓環，數量隨答案變化
+  ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2;
+  for(let i=0;i<3+answers[4];i++){
+    ctx.beginPath();ctx.arc(r()*W,r()*W,60+r()*220,0,Math.PI*2);ctx.stroke();
+  }
+  // 顆粒質感
+  for(let i=0;i<9000;i++){
+    ctx.fillStyle=r()>.5?'rgba(255,255,255,.07)':'rgba(0,0,0,.05)';
+    ctx.fillRect(r()*W,r()*W,2,2);
+  }
+  // 作品標題
+  ctx.fillStyle='rgba(255,255,255,.92)';
+  ctx.font='700 44px "Noto Serif TC",serif';
+  ctx.fillText('今天的我：'+T.name,48,W-52);
+}
+
+$('go').onclick=()=>{step=0;answers=[];renderQ();show('s-quiz')};
+$('again').onclick=()=>{document.body.style.background='';show('s-start')};
+$('dl').onclick=()=>{
+  const a=document.createElement('a');
+  a.download='my-color-today.png';a.href=$('cv').toDataURL('image/png');a.click();
+};
+</script>
+</body>
+</html>
